@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # OpenFaaS gateway metrics
+  - job_name: "openfaas-gateway"
+    static_configs:
+      - targets: ["172.18.0.1:8080"]
+    metrics_path: /metrics
+
+  # MinIO Prometheus metrics
+  - job_name: "minio"
+    static_configs:
+      - targets: ["minio:9000"]
+    metrics_path: /minio/v2/metrics/cluster
+    bearer_token: ""
+
+  # FastAPI gateway (if it exposes /metrics via prometheus-fastapi-instrumentator)
+  - job_name: "fastapi-gateway"
+    static_configs:
+      - targets: ["gateway:5000"]
+    metrics_path: /metrics

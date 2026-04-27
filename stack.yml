@@ -1,0 +1,62 @@
+version: 1.0
+provider:
+  name: openfaas
+  gateway: http://127.0.0.1:8080
+
+functions:
+  fn-image-resize:
+    lang: python3-http
+    handler: ./fn-image-resize
+    image: 127.0.0.1:5001/fn-image-resize:latest
+    environment:
+      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_SECURE: "false"
+    labels:
+      com.openfaas.scale.min: 3
+      com.openfaas.scale.max: 10
+      com.openfaas.scale.factor: 20
+
+  fn-image-enhance:
+    lang: python3-http
+    handler: ./fn-image-enhance
+    image: 127.0.0.1:5001/fn-image-enhance:latest
+    environment:
+      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_SECURE: "false"
+    labels:
+      com.openfaas.scale.min: 3
+      com.openfaas.scale.max: 10
+      com.openfaas.scale.factor: 20
+
+  fn-image-filter:
+    lang: python3-http
+    handler: ./fn-image-filter
+    image: 127.0.0.1:5001/fn-image-filter:latest
+    environment:
+      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_SECURE: "false"
+    labels:
+      com.openfaas.scale.min: 3
+      com.openfaas.scale.max: 10
+      com.openfaas.scale.factor: 20
+
+  fn-minio-trigger:
+    lang: python3-http
+    handler: ./fn-minio-trigger
+    image: 127.0.0.1:5001/fn-minio-trigger:latest
+    environment:
+      OPENFAAS_GATEWAY: "http://127.0.0.1:8080"
+      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_SECURE: "false"
+    labels:
+      com.openfaas.scale.min: 3
+      com.openfaas.scale.max: 10
+      com.openfaas.scale.factor: 20

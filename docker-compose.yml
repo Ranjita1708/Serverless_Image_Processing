@@ -1,0 +1,73 @@
+version: "3.8"
+
+networks:
+  serverless-net:
+    driver: bridge
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - serverless-net
+
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - serverless-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/image-processing.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/provisioning/dashboards:/var/lib/grafana/dashboards:ro
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: fastapi-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      OPENFAAS_GATEWAY: "http://host.docker.internal:8080"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
+    depends_on:
+      - minio
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - serverless-net
+
+volumes:
+  minio-data:
+  prometheus-data:
+  grafana-data:
