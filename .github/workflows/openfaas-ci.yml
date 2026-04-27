@@ -10,7 +10,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}
 
 jobs:
   build-and-push:
@@ -20,6 +19,10 @@ jobs:
       packages: write
 
     steps:
+      - name: Lowercase Repository Owner
+        id: lowercase_owner
+        run: |
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v4
 
