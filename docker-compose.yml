@@ -50,15 +50,13 @@ services:
       - ./monitoring/provisioning/dashboards:/var/lib/grafana/dashboards:ro
 
   gateway:
-    build:
-      context: ./gateway
-      dockerfile: Dockerfile
+    image: gateway-image:latest
     container_name: fastapi-gateway
     ports:
       - "5000:5000"
     environment:
       OPENFAAS_GATEWAY: "http://host.docker.internal:8080"
-      MINIO_ENDPOINT: "host.docker.internal:9000"
+      MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"

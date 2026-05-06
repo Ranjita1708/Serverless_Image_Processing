@@ -111,6 +111,25 @@ def _unique_filename(original_name: str) -> str:
     return f"{ts}_{uid}_{safe_name}"
 
 
+def _save_bytes_to_minio(bucket_name: str, object_name: str, data: bytes, content_type: str = "image/jpeg"):
+    """Internal helper to save raw bytes to a specific MinIO bucket/key."""
+    try:
+        client = _get_minio_client()
+        if not client.bucket_exists(bucket_name):
+            client.make_bucket(bucket_name)
+        
+        import io
+        client.put_object(
+            bucket_name,
+            object_name,
+            io.BytesIO(data),
+            length=len(data),
+            content_type=content_type,
+        )
+        print(f"MinIO Save Success: {bucket_name}/{object_name}")
+    except Exception as e:
+        print(f"MinIO Save Error: {e}")
+
 def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = "") -> Response:
     """Decode a base64 image string and return it as a raw HTTP image response."""
     image_bytes = base64.b64decode(b64_str)
@@ -127,26 +146,10 @@ def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = ""
     ext = ext_map.get(fmt_upper, "jpg")
     headers = {"Content-Disposition": f'inline; filename="processed.{ext}"'}
     if minio_path:
-        headers["X-MinIO-Path"] = minio_path   # e.g. processed/resize/1234_abc_photo.jpg
-        # Save directly to MinIO from the gateway to guarantee unique file persistence
-        try:
-            client = _get_minio_client()
-            bucket_name = minio_path.split("/")[0] # 'processed'
-            object_name = "/".join(minio_path.split("/")[1:]) # 'resize/1234.jpg'
-            
-            if not client.bucket_exists(bucket_name):
-                client.make_bucket(bucket_name)
-            
-            import io
-            client.put_object(
-                bucket_name,
-                object_name,
-                io.BytesIO(image_bytes),
-                length=len(image_bytes),
-                content_type=media_type,
-            )
-        except Exception as e:
-            print(f"Gateway MinIO Save Error: {e}")
+        headers["X-MinIO-Path"] = minio_path
+        bucket_name = minio_path.split("/")[0]
+        object_name = "/".join(minio_path.split("/")[1:])
+        _save_bytes_to_minio(bucket_name, object_name, image_bytes, media_type)
 
     return Response(content=image_bytes, media_type=media_type, headers=headers)
 
@@ -375,9 +378,13 @@ async def image_resize(
     quality: int = Form(85),
 ):
     fname = _unique_filename(file.filename or "upload.jpg")
+    source_bytes = file.file.read()
+    file.file.seek(0) # reset for next reads
+    _save_bytes_to_minio("images", fname, source_bytes, file.content_type or "image/jpeg")
+
     payload = {
-        "image_b64": _file_to_b64(file),
-        "filename": fname,          # handler uses this as the MinIO key
+        "image_b64": base64.b64encode(source_bytes).decode(),
+        "filename": fname,
         "width": width,
         "height": height,
         "maintain_aspect_ratio": maintain_aspect_ratio,
@@ -400,8 +407,12 @@ async def image_enhance(
     format: str = Form("JPEG"),
 ):
     fname = _unique_filename(file.filename or "upload.jpg")
+    source_bytes = file.file.read()
+    file.file.seek(0)
+    _save_bytes_to_minio("images", fname, source_bytes, file.content_type or "image/jpeg")
+
     payload = {
-        "image_b64": _file_to_b64(file),
+        "image_b64": base64.b64encode(source_bytes).decode(),
         "filename": fname,
         "brightness": brightness,
         "contrast": contrast,
@@ -421,8 +432,12 @@ async def image_filter(
     format: str = Form("JPEG"),
 ):
     fname = _unique_filename(file.filename or "upload.jpg")
+    source_bytes = file.file.read()
+    file.file.seek(0)
+    _save_bytes_to_minio("images", fname, source_bytes, file.content_type or "image/jpeg")
+
     payload = {
-        "image_b64": _file_to_b64(file),
+        "image_b64": base64.b64encode(source_bytes).decode(),
         "filename": fname,
         "filter": filter,
     }
@@ -447,16 +462,21 @@ async def image_pipeline(
     filter: str = Form("grayscale"),
 ):
     fname = _unique_filename(file.filename or "upload.jpg")
+    source_bytes = file.file.read()
+    file.file.seek(0)
+    _save_bytes_to_minio("images", fname, source_bytes, file.content_type or "image/jpeg")
+
     # Step 1: resize
     resize_result = _call_fn("fn-image-resize", {
-        "image_b64": _file_to_b64(file),
+        "image_b64": base64.b64encode(source_bytes).decode(),
         "filename": fname,
         "width": width,
         "height": height,
         "maintain_aspect_ratio": maintain_aspect_ratio,
-        "format": resize_format,
+        "format": "JPEG",
         "quality": resize_quality,
     })
+    
     # Step 2: enhance
     enhance_result = _call_fn("fn-image-enhance", {
         "image_b64": resize_result["image_b64"],
@@ -467,14 +487,16 @@ async def image_pipeline(
         "color": color,
         "auto_equalize": auto_equalize,
     })
-    # Step 3: filter (final output saved to MinIO)
+
+    # Step 3: filter
     filter_result = _call_fn("fn-image-filter", {
         "image_b64": enhance_result["image_b64"],
         "filename": fname,
         "filter": filter,
     })
-    minio_path = f"processed/filter/{fname}"  # final step saves here
-    return _b64_to_image_response(filter_result["image_b64"], resize_format, minio_path)
+
+    minio_path = f"processed/pipeline/{fname}"
+    return _b64_to_image_response(filter_result["image_b64"], "JPEG", minio_path)
 
 
 # ---------------------------------------------------------------------------

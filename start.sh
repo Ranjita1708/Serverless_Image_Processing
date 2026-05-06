@@ -1,17 +1,25 @@
 #!/bin/bash
 echo "Starting Serverless Architecture..."
 
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR"
+
 echo "1/3 Starting daemons (requires sudo)..."
 sudo service docker start
 sudo service containerd start
-sudo service faasd-provider start
-sudo service faasd start
+# Try to start faasd services if they exist as services
+sudo service faasd-provider start 2>/dev/null
+sudo service faasd start 2>/dev/null
 
-echo "2/3 Starting local Docker registry..."
+echo "2/3 Cleaning up old containers and starting registry..."
+# Remove the specific conflicting container if it exists
+docker rm -f fastapi-gateway 2>/dev/null
 docker start registry 2>/dev/null || docker run -d -p 5001:5000 --restart=always --name registry registry:2
 
 echo "3/3 Starting FastAPI, MinIO, and Grafana..."
-cd ~/serverless-image-processing && docker-compose up -d
+# Use docker-compose with force-recreate to avoid name conflicts
+docker-compose up -d --force-recreate
 
 echo "✅ All systems go!"
 echo "➡️  FastAPI Gateway: http://localhost:5000"
