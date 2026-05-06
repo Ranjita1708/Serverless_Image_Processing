@@ -15,6 +15,7 @@ A complete, production-ready serverless image processing pipeline running entire
 - [CI/CD Setup](#cicd-setup)
 - [Running Tests Locally](#running-tests-locally)
 - [OpenFaaS Autoscaling (Without Kubernetes)](#openfaas-autoscaling-without-kubernetes)
+- [Day-to-Day Operations](#day-to-day-operations)
 - [File Structure](#file-structure)
 
 ---
@@ -41,7 +42,9 @@ FastAPI Gateway (:5000)                                       │
     └── POST /process/pipeline (resize→enhance→filter)        │
                                                               │
 Prometheus (:9090) ──► Grafana (:3000)                        │
-    scrapes: OpenFaaS gateway + MinIO metrics                 │
+    scrapes: OpenFaaS gateway (172.18.0.1:8080)               │
+             MinIO metrics (:9000)                            │
+             FastAPI gateway (:5000)                          │
 ```
 
 ### Technology Stack
@@ -50,12 +53,13 @@ Prometheus (:9090) ──► Grafana (:3000)                        │
 |-----------|-----------|------|
 | Serverless Runtime | OpenFaaS **faasd** | Binary daemon (no K8s, no Swarm) |
 | Object Storage | MinIO | Docker container |
-| API Gateway | FastAPI + uvicorn | Docker container |
-| Monitoring | Prometheus + Grafana | Docker Compose |
-| Functions | Python 3 (`python3-http` template) | OpenFaaS containers |
+| API Gateway | FastAPI + uvicorn | Docker container (2 workers) |
+| Monitoring | Prometheus (standalone) + Grafana | Prometheus binary; Grafana in Docker |
+| Functions | Python 3 (`python3-http` template) | OpenFaaS containers via containerd |
 | Image Processing | Pillow | In-function |
 | Storage SDK | MinIO Python SDK | In-function |
-| CI/CD | GitHub Actions | Cloud |
+| Local Image Registry | Docker Registry v2 | Docker container on port 5001 |
+| CI/CD | GitHub Actions → GHCR | Cloud (build & push only) |
 
 ---
 
@@ -80,12 +84,29 @@ This script will:
 2. Install `faasd` (OpenFaaS daemon binary)
 3. Install `faas-cli`
 4. Install MinIO `mc` client
-5. Start faasd service
-6. Start Docker Compose (MinIO + Prometheus + Grafana + FastAPI gateway)
-7. Pull the `python3-http` OpenFaaS template
-8. Build and deploy all 4 functions
-9. Configure MinIO buckets and webhooks
-10. Print all service URLs
+5. Start faasd service (via `containerd`)
+6. Start a local Docker registry on port **5001**
+7. Start Docker Compose (MinIO + Grafana + FastAPI gateway)
+8. Start Prometheus (standalone binary or container)
+9. Pull the `python3-http` OpenFaaS template
+10. Build and deploy all 4 functions to the local registry
+11. Configure MinIO buckets and webhooks
+12. Print all service URLs
+
+### Restarting after a reboot
+
+A convenience script is provided to restart all daemons and containers after a WSL/system restart:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+This will:
+- Start Docker and containerd daemons
+- Start `faasd-provider` and `faasd` services
+- Start (or create) the local Docker registry container
+- Bring up Docker Compose (MinIO, Grafana, FastAPI gateway)
 
 ---
 
@@ -99,8 +120,10 @@ This script will:
 | **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
 | **FastAPI Gateway** | http://localhost:5000 | none |
 | **FastAPI Docs (Swagger)** | http://localhost:5000/docs | none |
+| **FastAPI Docs (ReDoc)** | http://localhost:5000/redoc | none |
 | **Prometheus** | http://localhost:9090 | none |
 | **Grafana** | http://localhost:3000 | admin / admin |
+| **Local Docker Registry** | http://localhost:5001 | none |
 
 ---
 
@@ -121,6 +144,7 @@ Returns gateway status and OpenFaaS connectivity.
   "gateway": "fastapi",
   "openfaas_reachable": true,
   "openfaas_gateway": "http://localhost:8080",
+  "openfaas_detail": "OK",
   "timestamp": 1714000000.0
 }
 ```
@@ -138,6 +162,7 @@ Lists all available functions and their accepted parameters.
     {
       "name": "fn-image-resize",
       "endpoint": "/process/resize",
+      "description": "Resize image to specified dimensions.",
       "params": { "width": "...", "height": "...", ... }
     },
     ...
@@ -365,6 +390,8 @@ monitoring/provisioning/dashboards/image-processing.json
 - `dashboard.yml` tells Grafana to load JSON dashboards from `/var/lib/grafana/dashboards/`.
 - `image-processing.json` is a complete pre-built dashboard that loads automatically.
 
+> **Note:** Grafana uses `host.docker.internal` (mapped to `host-gateway`) to reach Prometheus and the OpenFaaS faasd gateway running on the WSL host.
+
 ### Dashboard panels
 
 | Panel | Query |
@@ -376,33 +403,65 @@ monitoring/provisioning/dashboards/image-processing.json
 
 Visit **http://localhost:3000** (admin/admin) — the dashboard will already be loaded.
 
+### Prometheus Scrape Targets
+
+Prometheus is configured to scrape three targets (see `monitoring/prometheus.yml`):
+
+| Job | Target | Metrics Path |
+|-----|--------|-------------|
+| `openfaas-gateway` | `172.18.0.1:8080` | `/metrics` |
+| `minio` | `minio:9000` | `/minio/v2/metrics/cluster` |
+| `fastapi-gateway` | `gateway:5000` | `/metrics` |
+
+> **Note:** `172.18.0.1` is the default WSL2 bridge IP used to reach the faasd host from within Docker containers.
+
 ---
 
 ## CI/CD Setup
 
-The GitHub Actions pipeline (`.github/workflows/deploy.yml`) has three jobs:
+The GitHub Actions pipeline (`.github/workflows/openfaas-ci.yml`) has one job that triggers on pushes and pull requests to `main`:
 
 | Job | Trigger | Steps |
 |-----|---------|-------|
-| `test` | Every push/PR | `pytest tests/` with mocked MinIO |
-| `build-and-push` | Push to `main` only | Build + push Docker images to DockerHub |
-| `deploy` | After build succeeds | `faas-cli build` + `faas-cli push` + `faas-cli deploy` |
+| `build-and-push` | Push/PR to `main` | Lowercase owner name → checkout → QEMU + Buildx setup → login to GHCR → install faas-cli → rewrite stack.yml image refs to GHCR → `faas-cli build` + `faas-cli push` |
 
-### Required Secrets
+### Registry
 
-Add these in **GitHub → Settings → Secrets and variables → Actions**:
+Images are pushed to **GitHub Container Registry (GHCR)** at:
+```
+ghcr.io/<your-github-username>/<function-name>:latest
+```
 
-| Secret | Description |
-|--------|-------------|
-| `DOCKERHUB_USERNAME` | Your DockerHub username |
-| `DOCKERHUB_TOKEN` | DockerHub access token (not password) |
-| `OPENFAAS_GATEWAY` | Full URL of your OpenFaaS gateway e.g. `http://1.2.3.4:8080` |
-| `OPENFAAS_PASSWORD` | OpenFaaS admin password |
+The CI pipeline rewrites image references in `stack.yml` from the local registry (`127.0.0.1:5001/...`) to GHCR automatically.
+
+### Required Secrets / Permissions
+
+| Secret / Permission | Description |
+|---------------------|-------------|
+| `GITHUB_TOKEN` | Automatically provided — used to authenticate with GHCR |
+
+No additional secrets are needed. GHCR authentication uses the built-in `GITHUB_TOKEN` with `packages: write` permission.
 
 ### Get your OpenFaaS password (local)
 
 ```bash
 sudo cat /var/lib/faasd/secrets/basic-auth-password
+```
+
+### Deploying after a CI build
+
+The CI pipeline builds and pushes images but **does not auto-deploy**. To deploy locally after images are pushed:
+
+```bash
+# Pull updated images from GHCR and deploy
+faas-cli deploy -f stack.yml --replace=false
+```
+
+Or use the local registry flow:
+```bash
+faas-cli build -f stack.yml
+faas-cli push -f stack.yml
+faas-cli deploy -f stack.yml
 ```
 
 ---
@@ -451,10 +510,12 @@ This will:
 
 ### Scale labels in stack.yml
 
+All four functions are configured with the same autoscaling parameters:
+
 ```yaml
 labels:
-  com.openfaas.scale.min: 1    # Always keep at least 1 replica warm
-  com.openfaas.scale.max: 5    # Maximum replicas under load
+  com.openfaas.scale.min: 3     # Always keep at least 3 replicas warm
+  com.openfaas.scale.max: 10    # Maximum replicas under load
   com.openfaas.scale.factor: 20 # Scale up by 20% of max per step
 ```
 
@@ -468,42 +529,94 @@ labels:
 
 ---
 
+## Day-to-Day Operations
+
+### Start everything after a reboot
+
+```bash
+./start.sh
+```
+
+### Check all services are healthy
+
+```bash
+# OpenFaaS
+curl http://localhost:8080/healthz
+
+# FastAPI gateway
+curl http://localhost:5000/health
+
+# MinIO
+curl http://localhost:9000/minio/health/live
+```
+
+### Deploy/redeploy functions
+
+```bash
+# Build against local registry
+faas-cli build -f stack.yml
+
+# Push to local registry (127.0.0.1:5001)
+faas-cli push -f stack.yml
+
+# Deploy/redeploy
+faas-cli deploy -f stack.yml
+```
+
+### View function logs
+
+```bash
+faas-cli logs fn-image-resize
+faas-cli logs fn-image-enhance
+faas-cli logs fn-image-filter
+faas-cli logs fn-minio-trigger
+```
+
+### Set up MinIO webhook (after fresh MinIO start)
+
+```bash
+./scripts/setup-minio-webhook.sh
+```
+
+---
+
 ## File Structure
 
 ```
 serverless-image-processing/
-├── stack.yml                           # OpenFaaS function definitions
-├── docker-compose.yml                  # MinIO, Prometheus, Grafana, gateway
+├── stack.yml                           # OpenFaaS function definitions (local registry: 127.0.0.1:5001)
+├── docker-compose.yml                  # MinIO, Grafana, FastAPI gateway
+├── start.sh                            # Restart all services after reboot
 │
 ├── fn-image-resize/
 │   ├── handler.py                      # Resize logic + MinIO I/O
-│   └── requirements.txt
+│   └── requirements.txt               # Pillow, minio
 │
 ├── fn-image-enhance/
-│   ├── handler.py                      # Enhance logic (brightness/contrast/etc)
-│   └── requirements.txt
+│   ├── handler.py                      # Enhance logic (brightness/contrast/sharpness/color)
+│   └── requirements.txt               # Pillow, minio
 │
 ├── fn-image-filter/
-│   ├── handler.py                      # 13 named filters
-│   └── requirements.txt
+│   ├── handler.py                      # 13 named filters via Pillow
+│   └── requirements.txt               # Pillow, minio
 │
 ├── fn-minio-trigger/
-│   ├── handler.py                      # S3 event parser + router
-│   └── requirements.txt
+│   ├── handler.py                      # S3 event parser + function router
+│   └── requirements.txt               # requests
 │
 ├── gateway/
-│   ├── app.py                          # FastAPI app (6 endpoints)
-│   ├── requirements.txt
-│   └── Dockerfile
+│   ├── app.py                          # FastAPI app (6 endpoints, CORS enabled)
+│   ├── requirements.txt               # fastapi, uvicorn, pillow, minio, requests
+│   └── Dockerfile                      # python:3.11-slim, 2 uvicorn workers
 │
 ├── monitoring/
-│   ├── prometheus.yml                  # Scrape config
+│   ├── prometheus.yml                  # Scrape: OpenFaaS (172.18.0.1:8080), MinIO, FastAPI
 │   └── provisioning/
 │       ├── datasources/
-│       │   └── datasource.yml          # Auto-configure Prometheus datasource
+│       │   └── datasource.yml          # Auto-configure Prometheus datasource in Grafana
 │       └── dashboards/
 │           ├── dashboard.yml           # Dashboard provider config
-│           └── image-processing.json   # Pre-built dashboard
+│           └── image-processing.json   # Pre-built Grafana dashboard
 │
 ├── scripts/
 │   ├── setup.sh                        # One-command environment setup
@@ -515,7 +628,7 @@ serverless-image-processing/
 │
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml                  # CI/CD: test → build → push → deploy
+│       └── openfaas-ci.yml             # CI: build + push to GHCR on push/PR to main
 │
 └── README.md
 ```
