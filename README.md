@@ -69,11 +69,11 @@ High-Performance Storage (MinIO) ◄──────────────�
 
 ### Persistent Image Transformation
 `POST /image/{function_id}`
-Executes a single processing function (Resize, Enhance, or Filter). The gateway ensures the resulting artifact is uniquely persisted to the `processed/` bucket before returning the response.
+Executes a single processing function (Resize, Enhance, or Filter). The gateway ensures the source image is persisted to the `images/` bucket and the resulting artifact is uniquely persisted to the `processed/` bucket before returning the response.
 
 ### Sequential Processing Pipeline
 `POST /image/pipeline`
-Orchestrates a complex multi-function sequence. The gateway manages the data flow between functions, ensuring memory efficiency and final state persistence.
+Orchestrates a complex multi-function sequence. The gateway persists the original source to the `images/` bucket and manages the data flow between functions, ensuring final state persistence in the `processed/` bucket.
 
 ---
 
