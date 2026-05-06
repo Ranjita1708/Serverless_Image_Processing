@@ -22,15 +22,30 @@ import uuid
 from typing import Optional
 
 import requests
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+import io
+from minio import Minio
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 OPENFAAS_GATEWAY = os.environ.get("OPENFAAS_GATEWAY", "http://localhost:8080")
 FN_TIMEOUT = 60  # seconds per function call
+
+MINIO_ENDPOINT   = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
+MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "minioadmin")
+MINIO_SECURE     = os.environ.get("MINIO_SECURE", "false").lower() == "true"
+
+def _get_minio_client() -> Minio:
+    return Minio(
+        MINIO_ENDPOINT, 
+        access_key=MINIO_ACCESS_KEY, 
+        secret_key=MINIO_SECRET_KEY, 
+        secure=MINIO_SECURE
+    )
 
 app = FastAPI(
     title="Serverless Image Processing Gateway",
@@ -113,6 +128,26 @@ def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = ""
     headers = {"Content-Disposition": f'inline; filename="processed.{ext}"'}
     if minio_path:
         headers["X-MinIO-Path"] = minio_path   # e.g. processed/resize/1234_abc_photo.jpg
+        # Save directly to MinIO from the gateway to guarantee unique file persistence
+        try:
+            client = _get_minio_client()
+            bucket_name = minio_path.split("/")[0] # 'processed'
+            object_name = "/".join(minio_path.split("/")[1:]) # 'resize/1234.jpg'
+            
+            if not client.bucket_exists(bucket_name):
+                client.make_bucket(bucket_name)
+            
+            import io
+            client.put_object(
+                bucket_name,
+                object_name,
+                io.BytesIO(image_bytes),
+                length=len(image_bytes),
+                content_type=media_type,
+            )
+        except Exception as e:
+            print(f"Gateway MinIO Save Error: {e}")
+
     return Response(content=image_bytes, media_type=media_type, headers=headers)
 
 
@@ -141,6 +176,15 @@ def health():
         "timestamp": time.time(),
     }
 
+@app.get("/openfaas/status", summary="Get real-time function replicas and invocation counts")
+def get_openfaas_status():
+    try:
+        r = requests.get(f"{OPENFAAS_GATEWAY}/system/functions", auth=("admin", "admin"), timeout=5)
+        if r.status_code == 200:
+            return {"status": "ok", "functions": r.json()}
+        return {"status": "error", "detail": r.text}
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
 
 @app.get("/functions", summary="List available functions and their parameters")
 def list_functions():
@@ -432,6 +476,86 @@ async def image_pipeline(
     minio_path = f"processed/filter/{fname}"  # final step saves here
     return _b64_to_image_response(filter_result["image_b64"], resize_format, minio_path)
 
+
+# ---------------------------------------------------------------------------
+# MinIO Browser Endpoints (for UI)
+# ---------------------------------------------------------------------------
+
+@app.get("/minio/list/{bucket}", summary="List objects in a MinIO bucket")
+def list_minio_bucket(bucket: str = Path(...)):
+    try:
+        client = _get_minio_client()
+        if not client.bucket_exists(bucket):
+            return {"status": "ok", "objects": []}
+            
+        objects = client.list_objects(bucket, recursive=True)
+        res = []
+        for obj in objects:
+            res.append({
+                "key": obj.object_name,
+                "size": obj.size,
+                "last_modified": obj.last_modified.isoformat() if obj.last_modified else None,
+            })
+        return {"status": "ok", "objects": res}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/minio/get/{bucket}/{key:path}", summary="Get object from MinIO as base64")
+def get_minio_object(bucket: str = Path(...), key: str = Path(...)):
+    try:
+        client = _get_minio_client()
+        response = client.get_object(bucket, key)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        return {"status": "ok", "image_b64": base64.b64encode(data).decode()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/minio/download/{bucket}/{key:path}", summary="Get raw object from MinIO")
+def download_minio_object(bucket: str = Path(...), key: str = Path(...)):
+    try:
+        client = _get_minio_client()
+        response = client.get_object(bucket, key)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        
+        # Determine content type from extension
+        ext = key.split('.')[-1].lower() if '.' in key else 'jpeg'
+        media_type = f"image/{ext}" if ext in ['png', 'gif', 'webp'] else "image/jpeg"
+        
+        return Response(content=data, media_type=media_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/minio/upload/{prefix}", summary="Upload a file directly to images/{prefix}/")
+async def upload_to_minio(
+    prefix: str = Path(...), 
+    file: UploadFile = File(...)
+):
+    try:
+        client = _get_minio_client()
+        bucket = "images"
+        if not client.bucket_exists(bucket):
+            client.make_bucket(bucket)
+            
+        data = await file.read()
+        fname = _unique_filename(file.filename)
+        dest_key = f"{prefix}/{fname}"
+        
+        client.put_object(
+            bucket, 
+            dest_key, 
+            io.BytesIO(data), 
+            length=len(data), 
+            content_type=file.content_type or "image/jpeg"
+        )
+        return {"status": "ok", "bucket": bucket, "key": dest_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ---------------------------------------------------------------------------
 # Entry point (for local dev)

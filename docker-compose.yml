@@ -31,7 +31,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     networks:
       - serverless-net
     extra_hosts:
@@ -40,6 +40,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/image-processing.json
     volumes:
       - grafana-data:/var/lib/grafana
@@ -56,7 +58,7 @@ services:
       - "5000:5000"
     environment:
       OPENFAAS_GATEWAY: "http://host.docker.internal:8080"
-      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ENDPOINT: "host.docker.internal:9000"
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"
