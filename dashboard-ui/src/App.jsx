@@ -70,10 +70,10 @@ export default function ServerlessDashboard() {
   const TabButton = ({ id, icon: Icon, label }) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-2 px-4 py-2 font-medium rounded-md transition-colors ${
+      className={`flex items-center gap-2 px-4 py-2 font-medium rounded-lg transition-all ${
         activeTab === id 
-          ? 'bg-slate-800 text-sky-400 border border-sky-500/30 shadow-[0_0_15px_rgba(56,189,248,0.1)]' 
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          ? 'bg-sky-500 text-white shadow-md shadow-sky-200' 
+          : 'text-slate-500 hover:text-sky-600 hover:bg-sky-50'
       }`}
     >
       <Icon size={18} />
@@ -82,24 +82,24 @@ export default function ServerlessDashboard() {
   );
 
   const StatusDot = ({ label, ok }) => (
-    <div className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 bg-slate-800 rounded-full border border-slate-700">
-      <div className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-red-500'}`} />
-      <span className="text-slate-300">{label}</span>
+    <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1 bg-white/50 backdrop-blur rounded-full border border-sky-100/50">
+      <div className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+      <span className="text-slate-600">{label}</span>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-200 font-sans selection:bg-sky-500/30 flex flex-col">
+    <div className="min-h-screen bg-transparent text-slate-800 font-sans selection:bg-sky-200 flex flex-col">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       
       {/* Navbar */}
-      <nav className="sticky top-0 z-40 bg-[#0F172A]/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <nav className="sticky top-0 z-40 bg-white/70 backdrop-blur-lg border-b border-sky-100 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-sky-400 to-blue-600 rounded-lg shadow-[0_0_20px_rgba(56,189,248,0.3)]">
+          <div className="p-2 bg-gradient-to-br from-sky-400 to-cyan-400 rounded-xl shadow-lg shadow-sky-200">
             <Zap className="text-white" size={24} />
           </div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 tracking-tight">
-            Serverless Image Processing
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+            Serverless <span className="text-sky-500">Image Processing</span>
           </h1>
         </div>
         
@@ -110,7 +110,7 @@ export default function ServerlessDashboard() {
         </div>
       </nav>
 
-      <div className="px-6 py-2 border-b border-slate-800/50 overflow-x-auto no-scrollbar flex gap-2">
+      <div className="px-6 py-2 border-b border-sky-100/50 bg-white/30 overflow-x-auto no-scrollbar flex gap-2">
         <TabButton id="dashboard" icon={Activity} label="Dashboard" />
         <TabButton id="process" icon={ImageIcon} label="Process Image" />
         <TabButton id="pipeline" icon={Box} label="Pipeline" />
@@ -122,10 +122,10 @@ export default function ServerlessDashboard() {
       {/* Main Content Area */}
       <main className="flex-1 p-6 overflow-y-auto w-full max-w-7xl mx-auto">
         {!health.gateway && (
-          <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 p-4 rounded-lg flex items-center gap-3">
+          <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-600 p-4 rounded-xl flex items-center gap-3 shadow-sm">
             <AlertTriangle />
             <div>
-              <p className="font-semibold">Backend Offline</p>
+              <p className="font-bold">Backend Offline</p>
               <p className="text-sm opacity-80">Cannot reach FastAPI gateway at {API_BASE}. Showing UI in offline mode.</p>
             </div>
           </div>
@@ -184,34 +184,34 @@ function DashboardPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(s => (
-          <div key={s.label} className="bg-[#1E293B] border border-slate-700/50 p-5 rounded-xl hover:-translate-y-1 transition-transform shadow-lg shadow-black/20">
-            <h3 className="text-slate-400 font-medium text-sm mb-1">{s.label}</h3>
-            <p className="text-3xl font-bold text-white mb-2">{s.val}</p>
-            <p className="text-xs text-sky-400/80 font-medium">{s.sub}</p>
+          <div key={s.label} className="bg-white border border-sky-100 p-5 rounded-2xl hover:shadow-lg transition-all shadow-sm">
+            <h3 className="text-slate-500 font-medium text-sm mb-1">{s.label}</h3>
+            <p className="text-3xl font-bold text-slate-800 mb-2">{s.val}</p>
+            <p className="text-xs text-sky-500 font-semibold">{s.sub}</p>
           </div>
         ))}
       </div>
       
-      <div className="bg-[#1E293B] border border-slate-700/50 rounded-xl overflow-hidden shadow-lg shadow-black/20">
-        <div className="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
-          <h2 className="font-semibold text-white">Recent Activity (Live Feed)</h2>
+      <div className="bg-white border border-sky-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-sky-50 bg-sky-50/20 flex justify-between items-center">
+          <h2 className="font-semibold text-slate-800">Recent Activity (Live Feed)</h2>
         </div>
-        <div className="divide-y divide-slate-700/50">
-          {objects.length === 0 && <div className="p-8 text-center text-slate-500">No processed images found. Run a function!</div>}
+        <div className="divide-y divide-sky-50">
+          {objects.length === 0 && <div className="p-8 text-center text-slate-400">No processed images found. Run a function!</div>}
           {objects.slice(0, 10).map((o, i) => (
-            <div key={o.key} className="p-4 flex items-center justify-between hover:bg-slate-800/30 transition-colors">
+            <div key={o.key} className="p-4 flex items-center justify-between hover:bg-sky-50/50 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-sky-500/10 flex items-center justify-center border border-sky-500/20">
-                  <img src={`${API_BASE}/minio/download/processed/${o.key}`} className="w-full h-full object-cover rounded-lg opacity-80" alt="" loading="lazy"/>
+                <div className="w-10 h-10 rounded-lg bg-sky-50 flex items-center justify-center border border-sky-100">
+                  <img src={`${API_BASE}/minio/download/processed/${o.key}`} className="w-full h-full object-cover rounded-lg" alt="" loading="lazy"/>
                 </div>
                 <div>
-                  <p className="text-white font-medium">{o.key.split('/').pop()}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Size: {(o.size / 1024).toFixed(1)} KB</p>
+                  <p className="text-slate-800 font-medium">{o.key.split('/').pop()}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Size: {(o.size / 1024).toFixed(1)} KB</p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Processed</span>
-                <p className="text-xs text-slate-500 mt-1">recently</p>
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-600 border border-emerald-200">Processed</span>
+                <p className="text-xs text-slate-400 mt-1 font-medium">recently</p>
               </div>
             </div>
           ))}
@@ -288,16 +288,16 @@ function ProcessPage({ addToast }) {
         <div 
           onDragOver={e => e.preventDefault()} 
           onDrop={onDrop}
-          className="border-2 border-dashed border-slate-700 bg-[#1E293B] rounded-xl p-8 text-center hover:border-sky-500/50 transition-colors cursor-pointer shadow-lg shadow-black/20"
+          className="border-2 border-dashed border-sky-100 bg-sky-50/50 rounded-2xl p-8 text-center hover:border-sky-300 transition-colors cursor-pointer shadow-sm"
         >
           <input type="file" id="up" className="hidden" onChange={onDrop} accept="image/*" />
           <label htmlFor="up" className="cursor-pointer flex flex-col items-center">
             {preview ? (
-              <img src={preview} className="max-h-48 object-contain rounded-lg shadow-md mb-4" alt="Preview" />
+              <img src={preview} className="max-h-48 object-contain rounded-xl shadow-md mb-4" alt="Preview" />
             ) : (
-              <UploadCloud size={48} className="text-sky-500 mb-4 opacity-80" />
+              <UploadCloud size={48} className="text-sky-400 mb-4 opacity-60" />
             )}
-            <span className="text-white font-medium">{file ? file.name : "Drag image here or click to browse"}</span>
+            <span className="text-slate-600 font-medium">{file ? file.name : "Drag image here or click to browse"}</span>
           </label>
         </div>
 
@@ -306,8 +306,8 @@ function ProcessPage({ addToast }) {
           {['resize', 'enhance', 'filter'].map(f => (
             <button 
               key={f} onClick={() => setFnType(f)}
-              className={`py-3 px-2 rounded-lg text-sm font-medium capitalize transition-all ${
-                fnType === f ? 'bg-sky-500 text-white shadow-[0_0_15px_rgba(56,189,248,0.4)]' : 'bg-[#1E293B] text-slate-400 hover:bg-slate-800 border border-slate-700/50'
+              className={`py-3 px-2 rounded-xl text-sm font-bold capitalize transition-all ${
+                fnType === f ? 'bg-sky-500 text-white shadow-md shadow-sky-200' : 'bg-white text-slate-500 hover:bg-sky-50 border border-sky-100'
               }`}
             >
               {f}
@@ -316,17 +316,17 @@ function ProcessPage({ addToast }) {
         </div>
 
         {/* Dynamic Params */}
-        <div className="bg-[#1E293B] border border-slate-700/50 p-5 rounded-xl shadow-lg shadow-black/20">
-          <h3 className="font-medium text-white mb-4 capitalize">{fnType} Settings</h3>
+        <div className="bg-white border border-sky-100 p-5 rounded-2xl shadow-sm">
+          <h3 className="font-bold text-slate-800 mb-4 capitalize">{fnType} Settings</h3>
           
           {fnType === 'resize' && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Width ({pWidth}px)</label>
+                <label className="text-sm text-slate-500 block mb-1 font-medium">Width ({pWidth}px)</label>
                 <input type="range" min="10" max="2000" value={pWidth} onChange={e=>setPWidth(e.target.value)} className="w-full accent-sky-500" />
               </div>
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Height ({pHeight}px)</label>
+                <label className="text-sm text-slate-500 block mb-1 font-medium">Height ({pHeight}px)</label>
                 <input type="range" min="10" max="2000" value={pHeight} onChange={e=>setPHeight(e.target.value)} className="w-full accent-sky-500" />
               </div>
             </div>
@@ -334,13 +334,13 @@ function ProcessPage({ addToast }) {
           
           {fnType === 'enhance' && (
             <div>
-              <label className="text-sm text-slate-400 block mb-1">Brightness ({pBrightness})</label>
+              <label className="text-sm text-slate-500 block mb-1 font-medium">Brightness ({pBrightness}x)</label>
               <input type="range" min="0.1" max="3" step="0.1" value={pBrightness} onChange={e=>setPBrightness(e.target.value)} className="w-full accent-sky-500" />
             </div>
           )}
 
           {fnType === 'filter' && (
-            <select value={pFilter} onChange={e=>setPFilter(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+            <select value={pFilter} onChange={e=>setPFilter(e.target.value)} className="w-full bg-slate-50 border border-sky-100 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-2 ring-sky-500/20 transition-all">
               {['grayscale', 'blur', 'sepia', 'edge', 'invert', 'posterize'].map(f => (
                 <option key={f} value={f}>{f}</option>
               ))}
@@ -350,7 +350,7 @@ function ProcessPage({ addToast }) {
           <button 
             onClick={processImage} 
             disabled={!file || loading}
-            className="w-full mt-6 bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(56,189,248,0.3)] disabled:opacity-50 transition-all flex justify-center items-center gap-2"
+            className="w-full mt-6 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-white font-bold py-3 rounded-xl shadow-lg shadow-sky-200 disabled:opacity-50 transition-all flex justify-center items-center gap-2"
           >
             {loading ? <RefreshCw className="animate-spin" /> : <Play size={18} fill="currentColor" />}
             {loading ? 'Processing...' : 'Run Function'}
@@ -359,18 +359,18 @@ function ProcessPage({ addToast }) {
       </div>
 
       <div className="lg:col-span-2">
-        <div className="bg-[#1E293B] border border-slate-700/50 rounded-xl h-full min-h-[500px] flex items-center justify-center overflow-hidden relative shadow-lg shadow-black/20 p-4">
+        <div className="bg-white border border-sky-100 rounded-2xl h-full min-h-[500px] flex items-center justify-center overflow-hidden relative shadow-sm p-4">
           {!preview && !result && (
-             <div className="text-center opacity-50">
+             <div className="text-center opacity-30">
                <ImageIcon size={64} className="mx-auto mb-4" />
-               <p>Output will appear here</p>
+               <p className="text-lg font-bold">Output will appear here</p>
              </div>
           )}
-          {preview && !result && <img src={preview} className="max-h-full max-w-full object-contain rounded" alt="Original" />}
-          {result && <img src={result} className="max-h-full max-w-full object-contain rounded shadow-[0_0_30px_rgba(56,189,248,0.2)]" alt="Processed" />}
+          {preview && !result && <img src={preview} className="max-h-full max-w-full object-contain rounded-xl" alt="Original" />}
+          {result && <img src={result} className="max-h-full max-w-full object-contain rounded-xl shadow-xl shadow-sky-100" alt="Processed" />}
           
           {result && (
-            <a href={result} download="processed.jpg" className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-700 text-white p-3 rounded-full hover:bg-sky-500 transition-colors shadow-lg">
+            <a href={result} download="processed.jpg" className="absolute bottom-4 right-4 bg-white/80 backdrop-blur border border-sky-100 text-sky-500 p-3 rounded-full hover:bg-sky-500 hover:text-white transition-all shadow-lg">
               <Download size={20} />
             </a>
           )}
@@ -442,64 +442,64 @@ function PipelinePage({ addToast }) {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Left: Pipeline Config */}
       <div className="lg:col-span-4 space-y-4">
-        <div className="bg-[#1E293B] border border-slate-700/50 rounded-xl p-6 shadow-lg shadow-black/20">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <Layers size={20} className="text-sky-400" /> Pipeline Flow
+        <div className="bg-white border border-sky-100 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Layers size={20} className="text-sky-500" /> Pipeline Flow
           </h3>
           
           <div className="space-y-4 relative">
             {/* Step 1: Resize */}
-            <div className={`p-4 rounded-xl border transition-all ${useResize ? 'bg-sky-500/10 border-sky-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${useResize ? 'bg-sky-50 border-sky-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
               <div className="flex justify-between items-center mb-4">
-                <span className="text-white font-bold flex items-center gap-2"><Maximize size={16}/> 1. Resize</span>
+                <span className="text-slate-700 font-bold flex items-center gap-2"><Maximize size={16}/> 1. Resize</span>
                 <input type="checkbox" checked={useResize} onChange={e=>setUseResize(e.target.checked)} className="w-5 h-5 accent-sky-500" />
               </div>
               {useResize && (
                 <div className="space-y-4">
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400"><span>Target Width</span><span>{pWidth}px</span></div>
+                    <div className="flex justify-between text-xs text-slate-500 font-medium"><span>Target Width</span><span>{pWidth}px</span></div>
                     <input type="range" min="100" max="1920" value={pWidth} onChange={e=>setPWidth(e.target.value)} className="w-full accent-sky-500" />
                   </div>
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400"><span>Target Height</span><span>{pHeight}px</span></div>
+                    <div className="flex justify-between text-xs text-slate-500 font-medium"><span>Target Height</span><span>{pHeight}px</span></div>
                     <input type="range" min="100" max="1920" value={pHeight} onChange={e=>setPHeight(e.target.value)} className="w-full accent-sky-500" />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-center"><ChevronDown size={20} className="text-slate-600" /></div>
+            <div className="flex justify-center"><ChevronDown size={20} className="text-sky-200" /></div>
 
             {/* Step 2: Enhance */}
-            <div className={`p-4 rounded-xl border transition-all ${useEnhance ? 'bg-purple-500/10 border-purple-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${useEnhance ? 'bg-purple-50 border-purple-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
               <div className="flex justify-between items-center mb-4">
-                <span className="text-white font-bold flex items-center gap-2"><Zap size={16}/> 2. Enhance</span>
+                <span className="text-slate-700 font-bold flex items-center gap-2"><Zap size={16}/> 2. Enhance</span>
                 <input type="checkbox" checked={useEnhance} onChange={e=>setUseEnhance(e.target.checked)} className="w-5 h-5 accent-purple-500" />
               </div>
               {useEnhance && (
                 <div className="space-y-4">
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400"><span>Brightness</span><span>{pBrightness}x</span></div>
+                    <div className="flex justify-between text-xs text-slate-500 font-medium"><span>Brightness</span><span>{pBrightness}x</span></div>
                     <input type="range" min="0.5" max="2" step="0.1" value={pBrightness} onChange={e=>setPBrightness(e.target.value)} className="w-full accent-purple-500" />
                   </div>
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400"><span>Contrast</span><span>{pContrast}x</span></div>
+                    <div className="flex justify-between text-xs text-slate-500 font-medium"><span>Contrast</span><span>{pContrast}x</span></div>
                     <input type="range" min="0.5" max="2" step="0.1" value={pContrast} onChange={e=>setPContrast(e.target.value)} className="w-full accent-purple-500" />
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-center"><ChevronDown size={20} className="text-slate-600" /></div>
+            <div className="flex justify-center"><ChevronDown size={20} className="text-sky-200" /></div>
 
             {/* Step 3: Filter */}
-            <div className={`p-4 rounded-xl border transition-all ${useFilter ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+            <div className={`p-4 rounded-2xl border transition-all ${useFilter ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
               <div className="flex justify-between items-center mb-4">
-                <span className="text-white font-bold flex items-center gap-2"><Filter size={16}/> 3. Filter</span>
+                <span className="text-slate-700 font-bold flex items-center gap-2"><Filter size={16}/> 3. Filter</span>
                 <input type="checkbox" checked={useFilter} onChange={e=>setUseFilter(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
               </div>
               {useFilter && (
-                <select value={pFilter} onChange={e=>setPFilter(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
+                <select value={pFilter} onChange={e=>setPFilter(e.target.value)} className="w-full bg-white border border-emerald-100 rounded-xl px-3 py-2 text-slate-700 text-sm outline-none focus:ring-2 ring-emerald-500/20">
                   {['grayscale', 'sepia', 'blur', 'edge', 'invert'].map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
               )}
@@ -509,7 +509,7 @@ function PipelinePage({ addToast }) {
           <button 
             onClick={runPipeline}
             disabled={!file || loading}
-            className="w-full mt-8 bg-sky-500 hover:bg-sky-400 text-white font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.3)] disabled:opacity-50 transition-all flex justify-center items-center gap-3"
+            className="w-full mt-8 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-white font-bold py-4 rounded-2xl shadow-lg shadow-sky-200 disabled:opacity-50 transition-all flex justify-center items-center gap-3"
           >
             {loading ? <RefreshCw className="animate-spin" /> : <Play size={20} fill="currentColor" />}
             {loading ? 'Executing Pipeline...' : 'Deploy Pipeline'}
@@ -521,12 +521,12 @@ function PipelinePage({ addToast }) {
       <div className="lg:col-span-8 space-y-4">
         <div 
           onDragOver={e => e.preventDefault()} onDrop={onDrop}
-          className="bg-[#1E293B] border border-slate-700/50 rounded-xl min-h-[600px] flex flex-col shadow-lg shadow-black/20 overflow-hidden"
+          className="bg-white border border-sky-100 rounded-2xl min-h-[600px] flex flex-col shadow-sm overflow-hidden"
         >
-          <div className="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
-            <span className="text-sm font-medium text-slate-400">Execution Preview</span>
+          <div className="p-4 border-b border-sky-50 bg-sky-50/30 flex justify-between items-center">
+            <span className="text-sm font-bold text-slate-500 tracking-wide uppercase">Execution Preview</span>
             <input type="file" id="pipe-up" className="hidden" onChange={onDrop} />
-            <label htmlFor="pipe-up" className="text-xs text-sky-400 hover:text-sky-300 cursor-pointer flex items-center gap-1 font-bold">
+            <label htmlFor="pipe-up" className="text-xs text-sky-500 hover:text-sky-600 cursor-pointer flex items-center gap-1 font-bold">
               <UploadCloud size={14}/> CHANGE SOURCE
             </label>
           </div>
@@ -534,20 +534,20 @@ function PipelinePage({ addToast }) {
           <div className="flex-1 flex items-center justify-center p-8 relative">
             {!preview && (
               <div className="text-center opacity-30">
-                <UploadCloud size={64} className="mx-auto mb-4" />
-                <p className="text-xl font-bold">Drop source image to start</p>
+                <UploadCloud size={64} className="mx-auto mb-4 text-sky-400" />
+                <p className="text-xl font-bold text-slate-800">Drop source image to start</p>
               </div>
             )}
             {preview && !result && (
               <div className="text-center">
-                <img src={preview} className="max-h-[500px] rounded-lg shadow-2xl grayscale opacity-50" alt="Source" />
-                <p className="text-slate-500 mt-4 font-medium italic">Pending pipeline execution...</p>
+                <img src={preview} className="max-h-[500px] rounded-2xl shadow-lg grayscale opacity-40 border border-slate-100" alt="Source" />
+                <p className="text-slate-400 mt-6 font-bold tracking-widest uppercase text-xs">Waiting for deployment...</p>
               </div>
             )}
             {result && (
               <div className="w-full h-full flex items-center justify-center">
-                <img src={result} className="max-h-[500px] rounded-lg shadow-[0_0_50px_rgba(56,189,248,0.15)] ring-1 ring-sky-500/30" alt="Result" />
-                <a href={result} download="pipeline_result.jpg" className="absolute top-4 right-4 bg-emerald-500 text-white p-3 rounded-full hover:bg-emerald-400 transition-colors shadow-lg">
+                <img src={result} className="max-h-[500px] rounded-2xl shadow-2xl border border-sky-100" alt="Result" />
+                <a href={result} download="pipeline_result.jpg" className="absolute top-4 right-4 bg-emerald-500 text-white p-3 rounded-full hover:bg-emerald-400 transition-all shadow-lg">
                   <Download size={20} />
                 </a>
               </div>
@@ -586,26 +586,26 @@ function MinioPage({ addToast }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center bg-[#1E293B] p-4 rounded-xl border border-slate-700/50 shadow-lg shadow-black/20">
+      <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-sky-100 shadow-sm">
         <div className="flex gap-2">
-          <button onClick={() => setBucket('images')} className={`px-4 py-2 rounded-lg font-medium text-sm ${bucket === 'images' ? 'bg-sky-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>📥 images bucket</button>
-          <button onClick={() => setBucket('processed')} className={`px-4 py-2 rounded-lg font-medium text-sm ${bucket === 'processed' ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>📤 processed bucket</button>
+          <button onClick={() => setBucket('images')} className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${bucket === 'images' ? 'bg-sky-500 text-white shadow-md shadow-sky-100' : 'bg-sky-50 text-sky-600 hover:bg-sky-100'}`}>📥 images bucket</button>
+          <button onClick={() => setBucket('processed')} className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${bucket === 'processed' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>📤 processed bucket</button>
         </div>
-        <button onClick={loadData} className="p-2 text-slate-400 hover:text-white bg-slate-800 rounded-lg"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
+        <button onClick={loadData} className="p-2 text-sky-500 hover:bg-sky-50 rounded-xl border border-sky-100 transition-all shadow-sm"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {objects.map(o => (
-          <div key={o.key} className="bg-[#1E293B] border border-slate-700/50 rounded-xl p-3 text-center hover:border-sky-500/50 transition-colors shadow-lg group">
-            <div className="aspect-square bg-slate-800 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden group-hover:ring-2 ring-sky-500/50 transition-all">
-               <img src={`${API_BASE}/minio/download/${bucket}/${o.key}`} className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" alt={o.key} loading="lazy" />
+          <div key={o.key} className="bg-white border border-sky-100 rounded-2xl p-3 text-center hover:shadow-lg transition-all shadow-sm group">
+            <div className="aspect-square bg-sky-50 rounded-xl mb-3 flex items-center justify-center relative overflow-hidden group-hover:ring-2 ring-sky-300 transition-all">
+               <img src={`${API_BASE}/minio/download/${bucket}/${o.key}`} className="object-cover w-full h-full" alt={o.key} loading="lazy" />
             </div>
-            <p className="text-xs text-white truncate font-medium" title={o.key}>{o.key.split('/').pop()}</p>
-            <p className="text-[10px] text-slate-500 mt-1">{Math.round(o.size/1024)} KB</p>
+            <p className="text-xs text-slate-700 truncate font-bold" title={o.key}>{o.key.split('/').pop()}</p>
+            <p className="text-[10px] text-slate-400 mt-1 font-medium">{Math.round(o.size/1024)} KB</p>
           </div>
         ))}
         {!loading && objects.length === 0 && (
-          <div className="col-span-full py-20 text-center text-slate-500">Bucket is empty</div>
+          <div className="col-span-full py-20 text-center text-slate-400 font-medium">Bucket is empty</div>
         )}
       </div>
     </div>
@@ -615,22 +615,24 @@ function MinioPage({ addToast }) {
 function MonitoringPage() {
   return (
     <div className="space-y-6">
-      <div className="bg-[#1E293B] border border-slate-700/50 p-6 rounded-xl shadow-lg shadow-black/20 h-[800px] flex flex-col">
-        <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-          <Activity size={18} className="text-sky-400"/> Real-time Grafana Metrics
+      <div className="bg-white border border-sky-100 p-8 rounded-2xl shadow-sm h-[800px] flex flex-col">
+        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <Activity size={20} className="text-sky-500"/> Real-time Grafana Metrics
         </h3>
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50 p-8 text-center">
-          <Activity size={64} className="text-sky-500 mb-6 opacity-80" />
-          <h2 className="text-2xl font-bold text-white mb-2">Live Metrics Dashboard</h2>
-          <p className="text-slate-400 max-w-md mb-8">
+        <div className="flex-1 flex flex-col items-center justify-center bg-sky-50/30 rounded-2xl border border-sky-100/50 p-12 text-center">
+          <div className="p-6 bg-sky-100 rounded-full mb-8 shadow-inner shadow-sky-200/50">
+            <Activity size={64} className="text-sky-500 animate-pulse" />
+          </div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-4 tracking-tight">Live Metrics Dashboard</h2>
+          <p className="text-slate-500 max-w-md mb-10 leading-relaxed font-medium">
             Your real-time metrics are securely running on your native Grafana instance. 
             Because of Grafana's strict security policies, it cannot be embedded inside an iframe.
           </p>
           <a 
-            href="http://localhost:3000/d/openfaas/openfaas?orgId=1&refresh=5s&theme=dark" 
+            href="http://localhost:3000/d/openfaas/openfaas?orgId=1&refresh=5s&theme=light" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 px-6 rounded-lg shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all flex items-center gap-2"
+            className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-white font-bold py-4 px-10 rounded-2xl shadow-lg shadow-sky-200 transition-all flex items-center gap-3 transform hover:-translate-y-1"
           >
             Open Grafana Dashboard <Maximize size={18} />
           </a>
@@ -676,30 +678,30 @@ function FunctionsPage() {
       {fns.map(f => {
         const liveInvs = objects.filter(o => o.key.startsWith(f.prefix)).length;
         return (
-          <div key={f.name} className="bg-[#1E293B] border border-slate-700/50 p-6 rounded-xl shadow-lg shadow-black/20 hover:border-sky-500/30 transition-colors">
+          <div key={f.name} className="bg-white border border-sky-100 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all group">
             <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-lg bg-slate-800 ${f.color}`}>
-                  <f.icon size={24} />
+              <div className="flex items-center gap-4">
+                <div className={`p-4 rounded-xl bg-sky-50/50 border border-sky-100 ${f.color} group-hover:scale-110 transition-transform`}>
+                  <f.icon size={28} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">{f.name}</h3>
-                  <p className="text-sm text-slate-400">OpenFaaS Function</p>
+                  <h3 className="font-bold text-slate-800 text-xl">{f.name}</h3>
+                  <p className="text-sm text-slate-400 font-medium tracking-wide uppercase">OpenFaaS Function</p>
                 </div>
               </div>
-              <div className={`px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider ${health ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                {health ? 'Ready' : 'Down'}
+              <div className={`px-4 py-1.5 border rounded-full text-[10px] font-bold uppercase tracking-[0.1em] ${health ? 'bg-emerald-50 text-emerald-500 border-emerald-100' : 'bg-red-50 text-red-500 border-red-100'}`}>
+                {health ? '● Ready' : '○ Down'}
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-1">Live Replicas</p>
-                <p className="text-xl font-semibold text-white">{health ? 1 : 0}</p>
+              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
+                <p className="text-xs text-slate-500 mb-1 font-bold tracking-tight uppercase">Live Replicas</p>
+                <p className="text-2xl font-black text-slate-800">{health ? 1 : 0}</p>
               </div>
-              <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                <p className="text-xs text-slate-500 mb-1">Live Invocations</p>
-                <p className="text-xl font-semibold text-white">{liveInvs}</p>
+              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
+                <p className="text-xs text-slate-500 mb-1 font-bold tracking-tight uppercase">Invocations</p>
+                <p className="text-2xl font-black text-slate-800">{liveInvs}</p>
               </div>
             </div>
           </div>

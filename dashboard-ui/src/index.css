@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
 body {
-  background-color: #0F172A;
+  @apply bg-gradient-to-br from-sky-50 via-white to-cyan-50 text-slate-900;
+  min-height: 100vh;
 }
