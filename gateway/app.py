@@ -4,22 +4,27 @@ FastAPI Gateway for Serverless Image Processing Pipeline
 Endpoints:
   GET  /health              — gateway + OpenFaaS connectivity
   GET  /functions           — list all available functions & params
-  POST /process/resize      — multipart upload → fn-image-resize
-  POST /process/enhance     — multipart upload → fn-image-enhance
-  POST /process/filter      — multipart upload → fn-image-filter
-  POST /process/pipeline    — chain: resize → enhance → filter (in-memory base64)
+  POST /process/resize      — multipart upload → fn-image-resize       (JSON)
+  POST /process/enhance     — multipart upload → fn-image-enhance      (JSON)
+  POST /process/filter      — multipart upload → fn-image-filter       (JSON)
+  POST /process/pipeline    — chain: resize → enhance → filter         (JSON)
+  POST /image/resize        — same as /process/resize  but returns raw image file
+  POST /image/enhance       — same as /process/enhance but returns raw image file
+  POST /image/filter        — same as /process/filter  but returns raw image file
+  POST /image/pipeline      — same as /process/pipeline but returns raw image file
 """
 
 import base64
 import json
 import os
 import time
+import uuid
 from typing import Optional
 
 import requests
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 # ---------------------------------------------------------------------------
 # Config
@@ -29,8 +34,12 @@ FN_TIMEOUT = 60  # seconds per function call
 
 app = FastAPI(
     title="Serverless Image Processing Gateway",
-    description="API gateway for event-driven image processing via OpenFaaS functions.",
-    version="1.0.0",
+    description=(
+        "API gateway for event-driven image processing via OpenFaaS functions.\n\n"
+        "**Tip:** Use the `/image/*` endpoints to get the processed image directly "
+        "(viewable in browser / downloadable). Use `/process/*` endpoints for JSON responses."
+    ),
+    version="1.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -77,6 +86,34 @@ def _call_fn(fn_name: str, payload: dict) -> dict:
 def _file_to_b64(upload: UploadFile) -> str:
     data = upload.file.read()
     return base64.b64encode(data).decode()
+
+
+def _unique_filename(original_name: str) -> str:
+    """Generate a unique filename: <timestamp>_<uuid8>_<original>."""
+    ts = int(time.time())
+    uid = uuid.uuid4().hex[:8]
+    safe_name = original_name.replace(" ", "_") if original_name else "upload.jpg"
+    return f"{ts}_{uid}_{safe_name}"
+
+
+def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = "") -> Response:
+    """Decode a base64 image string and return it as a raw HTTP image response."""
+    image_bytes = base64.b64decode(b64_str)
+    fmt_upper = fmt.upper()
+    media_type_map = {
+        "JPEG": "image/jpeg",
+        "JPG":  "image/jpeg",
+        "PNG":  "image/png",
+        "WEBP": "image/webp",
+        "GIF":  "image/gif",
+    }
+    media_type = media_type_map.get(fmt_upper, "image/jpeg")
+    ext_map = {"JPEG": "jpg", "JPG": "jpg", "PNG": "png", "WEBP": "webp", "GIF": "gif"}
+    ext = ext_map.get(fmt_upper, "jpg")
+    headers = {"Content-Disposition": f'inline; filename="processed.{ext}"'}
+    if minio_path:
+        headers["X-MinIO-Path"] = minio_path   # e.g. processed/resize/1234_abc_photo.jpg
+    return Response(content=image_bytes, media_type=media_type, headers=headers)
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +315,122 @@ async def process_pipeline(
             "filter":  filter_result.get("meta", {}).get("processing_time_ms"),
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# /image/* endpoints — return raw image bytes AND save to MinIO processed/
+# ---------------------------------------------------------------------------
+
+@app.post("/image/resize", summary="Resize image — returns raw image file + saves to MinIO", response_class=Response)
+async def image_resize(
+    file: UploadFile = File(...),
+    width: Optional[int] = Form(None),
+    height: Optional[int] = Form(None),
+    maintain_aspect_ratio: bool = Form(False),
+    format: str = Form("JPEG"),
+    quality: int = Form(85),
+):
+    fname = _unique_filename(file.filename or "upload.jpg")
+    payload = {
+        "image_b64": _file_to_b64(file),
+        "filename": fname,          # handler uses this as the MinIO key
+        "width": width,
+        "height": height,
+        "maintain_aspect_ratio": maintain_aspect_ratio,
+        "format": format,
+        "quality": quality,
+    }
+    result = _call_fn("fn-image-resize", payload)
+    minio_path = f"processed/resize/{fname}"
+    return _b64_to_image_response(result["image_b64"], format, minio_path)
+
+
+@app.post("/image/enhance", summary="Enhance image — returns raw image file + saves to MinIO", response_class=Response)
+async def image_enhance(
+    file: UploadFile = File(...),
+    brightness: float = Form(1.0),
+    contrast: float = Form(1.0),
+    sharpness: float = Form(1.0),
+    color: float = Form(1.0),
+    auto_equalize: bool = Form(False),
+    format: str = Form("JPEG"),
+):
+    fname = _unique_filename(file.filename or "upload.jpg")
+    payload = {
+        "image_b64": _file_to_b64(file),
+        "filename": fname,
+        "brightness": brightness,
+        "contrast": contrast,
+        "sharpness": sharpness,
+        "color": color,
+        "auto_equalize": auto_equalize,
+    }
+    result = _call_fn("fn-image-enhance", payload)
+    minio_path = f"processed/enhance/{fname}"
+    return _b64_to_image_response(result["image_b64"], format, minio_path)
+
+
+@app.post("/image/filter", summary="Filter image — returns raw image file + saves to MinIO", response_class=Response)
+async def image_filter(
+    file: UploadFile = File(...),
+    filter: str = Form("grayscale"),
+    format: str = Form("JPEG"),
+):
+    fname = _unique_filename(file.filename or "upload.jpg")
+    payload = {
+        "image_b64": _file_to_b64(file),
+        "filename": fname,
+        "filter": filter,
+    }
+    result = _call_fn("fn-image-filter", payload)
+    minio_path = f"processed/filter/{fname}"
+    return _b64_to_image_response(result["image_b64"], format, minio_path)
+
+
+@app.post("/image/pipeline", summary="Full pipeline (resize→enhance→filter) — returns raw image + saves to MinIO", response_class=Response)
+async def image_pipeline(
+    file: UploadFile = File(...),
+    width: Optional[int] = Form(None),
+    height: Optional[int] = Form(None),
+    maintain_aspect_ratio: bool = Form(False),
+    resize_format: str = Form("JPEG"),
+    resize_quality: int = Form(85),
+    brightness: float = Form(1.0),
+    contrast: float = Form(1.0),
+    sharpness: float = Form(1.0),
+    color: float = Form(1.0),
+    auto_equalize: bool = Form(False),
+    filter: str = Form("grayscale"),
+):
+    fname = _unique_filename(file.filename or "upload.jpg")
+    # Step 1: resize
+    resize_result = _call_fn("fn-image-resize", {
+        "image_b64": _file_to_b64(file),
+        "filename": fname,
+        "width": width,
+        "height": height,
+        "maintain_aspect_ratio": maintain_aspect_ratio,
+        "format": resize_format,
+        "quality": resize_quality,
+    })
+    # Step 2: enhance
+    enhance_result = _call_fn("fn-image-enhance", {
+        "image_b64": resize_result["image_b64"],
+        "filename": fname,
+        "brightness": brightness,
+        "contrast": contrast,
+        "sharpness": sharpness,
+        "color": color,
+        "auto_equalize": auto_equalize,
+    })
+    # Step 3: filter (final output saved to MinIO)
+    filter_result = _call_fn("fn-image-filter", {
+        "image_b64": enhance_result["image_b64"],
+        "filename": fname,
+        "filter": filter,
+    })
+    minio_path = f"processed/filter/{fname}"  # final step saves here
+    return _b64_to_image_response(filter_result["image_b64"], resize_format, minio_path)
 
 
 # ---------------------------------------------------------------------------

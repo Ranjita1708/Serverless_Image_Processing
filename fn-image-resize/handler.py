@@ -112,6 +112,9 @@ def handle(event, context):
             image_bytes = _fetch_from_minio(object_key)
         elif body.get("image_b64"):
             image_bytes = base64.b64decode(body["image_b64"])
+            # Use gateway-provided unique filename if present
+            if body.get("filename"):
+                filename = body["filename"]
         else:
             return {
                 "statusCode": 400,
