@@ -9,7 +9,7 @@ functions:
     handler: ./fn-image-resize
     image: 127.0.0.1:5001/fn-image-resize:latest
     environment:
-      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ENDPOINT: "10.62.0.1:9000"
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_SECURE: "false"
@@ -23,7 +23,7 @@ functions:
     handler: ./fn-image-enhance
     image: 127.0.0.1:5001/fn-image-enhance:latest
     environment:
-      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ENDPOINT: "10.62.0.1:9000"
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_SECURE: "false"
@@ -37,7 +37,7 @@ functions:
     handler: ./fn-image-filter
     image: 127.0.0.1:5001/fn-image-filter:latest
     environment:
-      MINIO_ENDPOINT: "localhost:9000"
+      MINIO_ENDPOINT: "10.62.0.1:9000"
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_SECURE: "false"
@@ -51,8 +51,8 @@ functions:
     handler: ./fn-minio-trigger
     image: 127.0.0.1:5001/fn-minio-trigger:latest
     environment:
-      OPENFAAS_GATEWAY: "http://127.0.0.1:8080"
-      MINIO_ENDPOINT: "localhost:9000"
+      OPENFAAS_GATEWAY: "http://10.62.0.1:8080"
+      MINIO_ENDPOINT: "10.62.0.1:9000"
       MINIO_ACCESS_KEY: "minioadmin"
       MINIO_SECRET_KEY: "minioadmin"
       MINIO_SECURE: "false"
