@@ -540,8 +540,8 @@ function PipelinePage({ addToast }) {
             )}
             {preview && !result && (
               <div className="text-center">
-                <img src={preview} className="max-h-[500px] rounded-2xl shadow-lg grayscale opacity-40 border border-slate-100" alt="Source" />
-                <p className="text-slate-400 mt-6 font-bold tracking-widest uppercase text-xs">Waiting for deployment...</p>
+                <img src={preview} className="max-h-[500px] rounded-2xl shadow-lg opacity-80 border border-sky-100" alt="Source" />
+                <p className="text-sky-500 mt-6 font-black tracking-[0.2em] uppercase text-xs animate-pulse">Waiting for deployment...</p>
               </div>
             )}
             {result && (
