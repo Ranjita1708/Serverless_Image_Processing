@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Activity, Server, Image as ImageIcon, Box, Database, 
   Settings, Play, Filter, Maximize, CheckCircle, XCircle, 
-  UploadCloud, RefreshCw, Download, Zap, AlertTriangle 
+  UploadCloud, RefreshCw, Download, Zap, AlertTriangle,
+  Layers, ChevronDown
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -379,13 +380,181 @@ function ProcessPage({ addToast }) {
   );
 }
 
-function PipelinePage() {
+function PipelinePage({ addToast }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  // Stage Toggles
+  const [useResize, setUseResize] = useState(true);
+  const [useEnhance, setUseEnhance] = useState(true);
+  const [useFilter, setUseFilter] = useState(true);
+
+  // Params
+  const [pWidth, setPWidth] = useState(800);
+  const [pHeight, setPHeight] = useState(600);
+  const [pBrightness, setPBrightness] = useState(1.1);
+  const [pContrast, setPContrast] = useState(1.1);
+  const [pFilter, setPFilter] = useState('sepia');
+
+  const onDrop = useCallback(e => {
+    e.preventDefault();
+    const f = e.dataTransfer ? e.dataTransfer.files[0] : e.target.files[0];
+    if (f && f.type.startsWith('image/')) {
+      setFile(f);
+      setPreview(URL.createObjectURL(f));
+      setResult(null);
+    }
+  }, []);
+
+  const runPipeline = async () => {
+    if (!file) return addToast('Select an image first', 'error');
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      
+      // If disabled, we send "passthrough" values
+      fd.append('width', useResize ? pWidth : '');
+      fd.append('height', useResize ? pHeight : '');
+      fd.append('maintain_aspect_ratio', 'true');
+      
+      fd.append('brightness', useEnhance ? pBrightness : 1.0);
+      fd.append('contrast', useEnhance ? pContrast : 1.0);
+      
+      fd.append('filter', useFilter ? pFilter : 'none');
+
+      const res = await fetch(`${API_BASE}/image/pipeline`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error('Pipeline Execution Failed');
+      
+      const blob = await res.blob();
+      setResult(URL.createObjectURL(blob));
+      addToast('Pipeline completed successfully!');
+    } catch (e) {
+      addToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 text-slate-400">
-      <Box size={64} className="opacity-20" />
-      <h2 className="text-2xl font-bold text-white">Visual Pipeline Builder</h2>
-      <p>Chain functions together (Resize → Enhance → Filter) in a visual editor.</p>
-      <div className="px-4 py-2 bg-slate-800 rounded-full text-sm font-medium text-sky-400 border border-sky-500/20">Coming soon in v1.1</div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Left: Pipeline Config */}
+      <div className="lg:col-span-4 space-y-4">
+        <div className="bg-[#1E293B] border border-slate-700/50 rounded-xl p-6 shadow-lg shadow-black/20">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <Layers size={20} className="text-sky-400" /> Pipeline Flow
+          </h3>
+          
+          <div className="space-y-4 relative">
+            {/* Step 1: Resize */}
+            <div className={`p-4 rounded-xl border transition-all ${useResize ? 'bg-sky-500/10 border-sky-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-white font-bold flex items-center gap-2"><Maximize size={16}/> 1. Resize</span>
+                <input type="checkbox" checked={useResize} onChange={e=>setUseResize(e.target.checked)} className="w-5 h-5 accent-sky-500" />
+              </div>
+              {useResize && (
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400"><span>Target Width</span><span>{pWidth}px</span></div>
+                    <input type="range" min="100" max="1920" value={pWidth} onChange={e=>setPWidth(e.target.value)} className="w-full accent-sky-500" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400"><span>Target Height</span><span>{pHeight}px</span></div>
+                    <input type="range" min="100" max="1920" value={pHeight} onChange={e=>setPHeight(e.target.value)} className="w-full accent-sky-500" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-center"><ChevronDown size={20} className="text-slate-600" /></div>
+
+            {/* Step 2: Enhance */}
+            <div className={`p-4 rounded-xl border transition-all ${useEnhance ? 'bg-purple-500/10 border-purple-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-white font-bold flex items-center gap-2"><Zap size={16}/> 2. Enhance</span>
+                <input type="checkbox" checked={useEnhance} onChange={e=>setUseEnhance(e.target.checked)} className="w-5 h-5 accent-purple-500" />
+              </div>
+              {useEnhance && (
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400"><span>Brightness</span><span>{pBrightness}x</span></div>
+                    <input type="range" min="0.5" max="2" step="0.1" value={pBrightness} onChange={e=>setPBrightness(e.target.value)} className="w-full accent-purple-500" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-400"><span>Contrast</span><span>{pContrast}x</span></div>
+                    <input type="range" min="0.5" max="2" step="0.1" value={pContrast} onChange={e=>setPContrast(e.target.value)} className="w-full accent-purple-500" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-center"><ChevronDown size={20} className="text-slate-600" /></div>
+
+            {/* Step 3: Filter */}
+            <div className={`p-4 rounded-xl border transition-all ${useFilter ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-800/50 border-slate-700 opacity-50'}`}>
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-white font-bold flex items-center gap-2"><Filter size={16}/> 3. Filter</span>
+                <input type="checkbox" checked={useFilter} onChange={e=>setUseFilter(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
+              </div>
+              {useFilter && (
+                <select value={pFilter} onChange={e=>setPFilter(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm">
+                  {['grayscale', 'sepia', 'blur', 'edge', 'invert'].map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
+
+          <button 
+            onClick={runPipeline}
+            disabled={!file || loading}
+            className="w-full mt-8 bg-sky-500 hover:bg-sky-400 text-white font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.3)] disabled:opacity-50 transition-all flex justify-center items-center gap-3"
+          >
+            {loading ? <RefreshCw className="animate-spin" /> : <Play size={20} fill="currentColor" />}
+            {loading ? 'Executing Pipeline...' : 'Deploy Pipeline'}
+          </button>
+        </div>
+      </div>
+
+      {/* Right: Preview */}
+      <div className="lg:col-span-8 space-y-4">
+        <div 
+          onDragOver={e => e.preventDefault()} onDrop={onDrop}
+          className="bg-[#1E293B] border border-slate-700/50 rounded-xl min-h-[600px] flex flex-col shadow-lg shadow-black/20 overflow-hidden"
+        >
+          <div className="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
+            <span className="text-sm font-medium text-slate-400">Execution Preview</span>
+            <input type="file" id="pipe-up" className="hidden" onChange={onDrop} />
+            <label htmlFor="pipe-up" className="text-xs text-sky-400 hover:text-sky-300 cursor-pointer flex items-center gap-1 font-bold">
+              <UploadCloud size={14}/> CHANGE SOURCE
+            </label>
+          </div>
+          
+          <div className="flex-1 flex items-center justify-center p-8 relative">
+            {!preview && (
+              <div className="text-center opacity-30">
+                <UploadCloud size={64} className="mx-auto mb-4" />
+                <p className="text-xl font-bold">Drop source image to start</p>
+              </div>
+            )}
+            {preview && !result && (
+              <div className="text-center">
+                <img src={preview} className="max-h-[500px] rounded-lg shadow-2xl grayscale opacity-50" alt="Source" />
+                <p className="text-slate-500 mt-4 font-medium italic">Pending pipeline execution...</p>
+              </div>
+            )}
+            {result && (
+              <div className="w-full h-full flex items-center justify-center">
+                <img src={result} className="max-h-[500px] rounded-lg shadow-[0_0_50px_rgba(56,189,248,0.15)] ring-1 ring-sky-500/30" alt="Result" />
+                <a href={result} download="pipeline_result.jpg" className="absolute top-4 right-4 bg-emerald-500 text-white p-3 rounded-full hover:bg-emerald-400 transition-colors shadow-lg">
+                  <Download size={20} />
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
