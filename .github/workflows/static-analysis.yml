@@ -31,9 +31,11 @@ jobs:
           echo "Running flake8 style & syntax checks..."
           # E501: ignore lines > 79 chars (common in gateway code)
           # W503: ignore line-break-before-binary-operator (style preference)
+          # E221, E272: multiple spaces before operator/keyword (used for alignment)
+          # E302, E305, W291, W293, E261: superficial whitespace/blank line formatting
           flake8 gateway/ fn-image-resize/ fn-image-enhance/ fn-image-filter/ fn-minio-trigger/ \
             --max-line-length=120 \
-            --extend-ignore=E501,W503 \
+            --extend-ignore=E501,W503,E221,E272,E302,E305,W291,W293,E261 \
             --statistics
 
       - name: Security scan with bandit

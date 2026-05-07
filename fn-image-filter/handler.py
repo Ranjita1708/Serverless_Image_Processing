@@ -4,7 +4,7 @@ import os
 import io
 import time
 import traceback
-from PIL import Image, ImageFilter, ImageOps, ImageEnhance
+from PIL import Image, ImageFilter, ImageOps
 from minio import Minio
 
 # ---------------------------------------------------------------------------
