@@ -1,0 +1,46 @@
+name: Static Code Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install analysis tools
+        run: |
+          pip install flake8 bandit
+
+      - name: Lint with flake8
+        run: |
+          echo "Running flake8 style & syntax checks..."
+          # E501: ignore lines > 79 chars (common in gateway code)
+          # W503: ignore line-break-before-binary-operator (style preference)
+          flake8 gateway/ fn-image-resize/ fn-image-enhance/ fn-image-filter/ fn-minio-trigger/ \
+            --max-line-length=120 \
+            --extend-ignore=E501,W503 \
+            --statistics
+
+      - name: Security scan with bandit
+        run: |
+          echo "Running bandit security scan..."
+          # -ll: only report medium and high severity issues
+          # -ii: only report medium and high confidence issues
+          bandit -r gateway/ fn-image-resize/ fn-image-enhance/ fn-image-filter/ fn-minio-trigger/ \
+            -ll -ii \
+            --format txt

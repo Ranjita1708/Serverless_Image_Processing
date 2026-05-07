@@ -49,16 +49,20 @@ export default function ServerlessDashboard() {
   // Polling Health
   useEffect(() => {
     const checkHealth = async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000); // 3s timeout
       try {
-        const res = await fetch(`${API_BASE}/health`);
+        const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
+        clearTimeout(timer);
         const data = await res.json();
         setHealth({
           gateway: true,
           openfaas: data.openfaas_reachable,
-          minio: data.minio_ok !== false,
+          minio: data.minio_ok === true,
           grafana: data.grafana_ok !== false
         });
       } catch (err) {
+        clearTimeout(timer);
         setHealth({ gateway: false, openfaas: false, minio: false, grafana: false });
       }
     };

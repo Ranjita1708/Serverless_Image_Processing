@@ -158,17 +158,35 @@ def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = ""
 # Routes
 # ---------------------------------------------------------------------------
 
+@app.get("/ping", summary="Instant liveness check")
+def ping():
+    """Ultra-fast liveness probe — always responds immediately."""
+    return {"status": "ok", "gateway": "fastapi", "timestamp": time.time()}
+
+
 @app.get("/health", summary="Health check")
 def health():
-    """Returns gateway status and OpenFaaS connectivity."""
+    """Returns gateway status and downstream service connectivity."""
     openfaas_ok = False
     openfaas_detail = ""
+    minio_ok = False
+    minio_detail = ""
+
+    # Non-blocking probes with short timeouts so the gateway always responds fast
     try:
-        r = requests.get(f"{OPENFAAS_GATEWAY}/healthz", timeout=5)
+        r = requests.get(f"{OPENFAAS_GATEWAY}/healthz", timeout=1)
         openfaas_ok = r.status_code == 200
         openfaas_detail = r.text[:200]
     except Exception as exc:
-        openfaas_detail = str(exc)
+        openfaas_detail = str(exc)[:120]
+
+    try:
+        client = _get_minio_client()
+        client.list_buckets()
+        minio_ok = True
+        minio_detail = "reachable"
+    except Exception as exc:
+        minio_detail = str(exc)[:120]
 
     return {
         "status": "ok",
@@ -176,6 +194,8 @@ def health():
         "openfaas_reachable": openfaas_ok,
         "openfaas_gateway": OPENFAAS_GATEWAY,
         "openfaas_detail": openfaas_detail,
+        "minio_ok": minio_ok,
+        "minio_detail": minio_detail,
         "timestamp": time.time(),
     }
 
