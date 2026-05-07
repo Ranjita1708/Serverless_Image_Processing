@@ -1,93 +1,94 @@
-# Advanced Serverless Image Processing Architecture
+# Serverless Image Processing Architecture
 
-An enterprise-grade, event-driven image processing ecosystem engineered for low-latency, scalable execution. This project leverages **OpenFaaS (faasd)** for serverless compute, **MinIO** for high-performance object storage, and a **FastAPI** orchestration gateway.
-
----
-
-## Technical Overview
-
-This platform provides an end-to-end serverless workflow for sophisticated image manipulation, featuring:
-*   **Orchestrated Pipeline Execution**: Sequential multi-stage processing with atomic state management.
-*   **Automated Persistence Layer**: Unique filename generation and collision avoidance utilizing SHA-256 derived hashes and temporal entropy.
-*   **Event-Driven Triggering**: Native S3 notification integration for background task automation.
-*   **Real-Time Observability**: Comprehensive telemetry via Prometheus and Grafana, monitoring function lifecycle and system throughput.
+An enterprise-grade, event-driven image processing ecosystem engineered for low-latency, scalable execution. This project leverages **OpenFaaS** for serverless compute, **MinIO** for high-performance object storage, and a **FastAPI** orchestration gateway.
 
 ---
 
-## System Architecture
+## 🏗️ System Architecture
 
-### Orchestration Workflow
-The architecture follows a modular gateway pattern where the FastAPI instance acts as the central controller, delegating intensive compute tasks to the OpenFaaS function provider.
+This platform provides an end-to-end serverless workflow for sophisticated image manipulation. It decouples the heavy lifting of image processing from the main application flow.
 
-```
-Request Source ──► FastAPI Gateway (Orchestrator) ──► OpenFaaS Provider (Compute)
-                         │                                    │
-                         │ (State Persistence)                │ (Atomic Processing)
-                         ▼                                    ▼
-High-Performance Storage (MinIO) ◄────────────────────────────┘
-```
-
-### Component Specification
+### Component Overview
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| **Control Plane** | FastAPI / Uvicorn | Request routing, security, and orchestration |
-| **Compute Engine** | OpenFaaS (faasd) | Resource-efficient serverless function execution |
-| **Object Storage** | MinIO (S3 Compatible) | High-availability persistence and event emission |
-| **User Interface** | React 18 | Real-time administrative dashboard (Pastel Design System) |
-| **Monitoring** | Grafana / Prometheus | Dimensional telemetry and performance analysis |
+| **Control Plane** | FastAPI | Request routing, UI health checks, and orchestration. Exposes `/process/*` and `/image/*` endpoints. |
+| **Compute Engine** | OpenFaaS (`faasd`) | Resource-efficient serverless function execution. Scales from zero. |
+| **Serverless Functions** | Python (Pillow) | 4 Microservices: `fn-image-resize`, `fn-image-enhance`, `fn-image-filter`, and `fn-minio-trigger`. |
+| **Object Storage** | MinIO (S3 Compatible)| Stores raw images in the `images` bucket and finished artifacts in the `processed` bucket. |
+| **User Interface** | React (Vite) | Real-time dashboard to test functions, build pipelines, and view MinIO files. |
+| **Monitoring** | Grafana / Prometheus | Dimensional telemetry tracking OpenFaaS invocations and latency. |
+
+### The Data Flow
+
+```text
+User ──► Frontend UI ──► FastAPI Gateway ──► OpenFaaS (fn-image-*)
+                               │                      │
+                               ▼                      ▼
+                           MinIO S3 ◄───────── "processed" bucket
+```
+
+**Background Async Processing (Webhook):**
+If you drop an image directly into the MinIO `images` bucket, MinIO fires an event to `fn-minio-trigger`, which automatically processes the image in the background without tying up the Gateway!
 
 ---
 
-## Deployment & Configuration
+## 🚀 Getting Started
 
-### Environment Requirements
-*   **OS**: Windows Subsystem for Linux (WSL 2) - Ubuntu 22.04 LTS
-*   **Runtime**: Docker Engine 24.0+ & Node.js 18+
-*   **Provider**: OpenFaaS `faasd` binary deployment
+### Prerequisites
+*   Windows Subsystem for Linux (WSL 2) running Ubuntu
+*   Docker Engine & Node.js 18+
+*   OpenFaaS `faas-cli` installed
 
-### Initialization Sequence
+### 1. Start the Backend Infrastructure
+We have bundled the startup of MinIO, Grafana, the local Docker registry, and the FastAPI Gateway into a single script. Run this in WSL:
 
-1. **Infrastructure Provisioning**:
-   ```bash
-   wsl docker-compose up -d
-   ```
+```bash
+chmod +x start.sh
+./start.sh
+```
+*(Note: This script may ask for your sudo password to ensure Docker daemons are running).*
 
-2. **Compute Provider Startup**:
-   ```bash
-   cd ~/faasd && sudo ./faasd up
-   ```
+### 2. Deploy Serverless Functions
+Build and deploy the 4 OpenFaaS functions to your local OpenFaaS environment:
 
-3. **Dashboard Interface**:
-   ```bash
-   cd dashboard-ui && npm install && npm run dev
-   ```
+```bash
+faas-cli up -f stack.yml
+```
 
----
+### 3. Start the Frontend Dashboard
+The React UI was recently moved to the `frontend` directory. Run it locally:
 
-## API Specification
-
-### Persistent Image Transformation
-`POST /image/{function_id}`
-Executes a single processing function (Resize, Enhance, or Filter). The gateway ensures the source image is persisted to the `images/` bucket and the resulting artifact is uniquely persisted to the `processed/` bucket before returning the response.
-
-### Sequential Processing Pipeline
-`POST /image/pipeline`
-Orchestrates a complex multi-function sequence. The gateway persists the original source to the `images/` bucket and manages the data flow between functions, ensuring final state persistence in the `processed/` bucket.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
-## Operational Endpoints
+## 📡 Operational Endpoints
 
-| Service | Access URL |
+| Service | Local Access URL |
 |---------|------------|
-| **Administrative UI** | http://localhost:5173 |
-| **API Gateway** | http://localhost:5000 |
+| **Interactive Dashboard** | http://localhost:5173 (or 5174) |
+| **FastAPI Gateway** | http://localhost:5000/docs |
 | **OpenFaaS Console** | http://localhost:8080/ui/ |
-| **Storage Management** | http://localhost:9001 |
-| **Monitoring Suite** | http://localhost:3000 |
+| **MinIO Storage Console** | http://localhost:9001 |
+| **Grafana Metrics** | http://localhost:3000 |
+
+*(Default credentials for MinIO and Grafana are `minioadmin`:`minioadmin` and `admin`:`admin` respectively).*
 
 ---
 
-## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 🤖 CI/CD Automation
+
+This repository utilizes **GitHub Actions** for continuous integration and delivery.
+
+1. **Static Analysis (`static-analysis.yml`)**: Runs on every push/PR. It uses `flake8` for PEP8 syntax linting and `bandit` for security vulnerability scanning.
+2. **Docker Build & Push (`openfaas-ci.yml`)**: Builds the OpenFaaS functions and publishes them to the GitHub Container Registry (`ghcr.io`) for remote deployment.
+
+---
+
+## 📜 License
+This project is licensed under the MIT License.
