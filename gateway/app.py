@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse, Response
 import io
 from minio import Minio
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # ---------------------------------------------------------------------------
 # Prometheus Metrics (matching OpenFaaS standard metric names for Grafana)
@@ -74,12 +75,67 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ---------------------------------------------------------------------------
+# Prometheus Metrics (must be defined before middleware)
+# ---------------------------------------------------------------------------
+REQUEST_COUNT = Counter(
+    'gateway_requests_total',
+    'Total number of requests to the gateway',
+    ['method', 'endpoint', 'status']
+)
+
+REQUEST_DURATION = Histogram(
+    'gateway_request_duration_seconds',
+    'Request duration in seconds',
+    ['method', 'endpoint']
+)
+
+FUNCTION_CALLS = Counter(
+    'openfaas_function_calls_total',
+    'Total number of OpenFaaS function calls',
+    ['function_name', 'status']
+)
+
+FUNCTION_DURATION = Histogram(
+    'openfaas_function_duration_seconds',
+    'OpenFaaS function call duration in seconds',
+    ['function_name']
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Middleware for metrics
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    """Track request metrics for all endpoints."""
+    # Skip metrics collection for the /metrics endpoint itself to avoid recursion
+    if request.url.path == "/metrics":
+        return await call_next(request)
+    
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+    
+    # Record metrics
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    REQUEST_DURATION.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+    
+    return response
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -91,8 +147,7 @@ def _fn_url(name: str) -> str:
 
 def _call_fn(fn_name: str, payload: dict) -> dict:
     """POST JSON payload to an OpenFaaS function, return parsed JSON body."""
-    t_start = time.time()
-    status_code = "200"
+    start_time = time.time()
     try:
         resp = requests.post(
             _fn_url(fn_name),
@@ -100,19 +155,15 @@ def _call_fn(fn_name: str, payload: dict) -> dict:
             timeout=FN_TIMEOUT,
         )
     except requests.Timeout:
-        status_code = "504"
-        GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
-        GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
+        FUNCTION_CALLS.labels(function_name=fn_name, status='timeout').inc()
+        FUNCTION_DURATION.labels(function_name=fn_name).observe(time.time() - start_time)
         raise HTTPException(status_code=504, detail=f"{fn_name} timed out after {FN_TIMEOUT}s")
     except requests.ConnectionError as exc:
-        status_code = "502"
-        GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
-        GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
+        FUNCTION_CALLS.labels(function_name=fn_name, status='error').inc()
+        FUNCTION_DURATION.labels(function_name=fn_name).observe(time.time() - start_time)
         raise HTTPException(status_code=502, detail=f"Cannot reach {fn_name}: {exc}")
 
-    status_code = str(resp.status_code)
-    GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
-    GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
+    FUNCTION_DURATION.labels(function_name=fn_name).observe(time.time() - start_time)
 
     try:
         body = resp.json()
@@ -120,8 +171,10 @@ def _call_fn(fn_name: str, payload: dict) -> dict:
         body = {"raw": resp.text}
 
     if resp.status_code >= 400:
+        FUNCTION_CALLS.labels(function_name=fn_name, status='error').inc()
         raise HTTPException(status_code=resp.status_code, detail=body)
 
+    FUNCTION_CALLS.labels(function_name=fn_name, status='success').inc()
     return body
 
 

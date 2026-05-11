@@ -70,15 +70,13 @@ services:
     ports:
       - "5000:5000"
     environment:
-      OPENFAAS_GATEWAY: "http://host.docker.internal:8080"
+      OPENFAAS_GATEWAY: "http://172.19.0.1:8080"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"
     depends_on:
       - minio
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - serverless-net
 
