@@ -633,7 +633,7 @@ function MonitoringPage() {
             Because of Grafana's strict security policies, it cannot be embedded inside an iframe.
           </p>
           <a 
-            href="http://localhost:3000/d/openfaas/openfaas?orgId=1&refresh=5s&theme=light" 
+            href="http://localhost:3001/d/openfaas/openfaas?orgId=1&refresh=5s&theme=light" 
             target="_blank" 
             rel="noopener noreferrer"
             className="bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-500 hover:to-cyan-400 text-white font-bold py-4 px-10 rounded-2xl shadow-lg shadow-sky-200 transition-all flex items-center gap-3 transform hover:-translate-y-1"
