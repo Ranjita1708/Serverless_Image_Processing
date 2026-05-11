@@ -3,21 +3,28 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # OpenFaaS gateway metrics
+  # OpenFaaS / faasd Prometheus metrics (exposed on port 8082)
   - job_name: "openfaas-gateway"
     static_configs:
-      - targets: ["172.18.0.1:8080"]
+      - targets: ["localhost:9090"]
     metrics_path: /metrics
 
   # MinIO Prometheus metrics
   - job_name: "minio"
     static_configs:
-      - targets: ["minio:9000"]
+      - targets: ["localhost:9000"]
     metrics_path: /minio/v2/metrics/cluster
-    bearer_token: ""
+    bearer_token: "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwcm9tZXRoZXVzIiwic3ViIjoibWluaW9hZG1pbiIsImV4cCI6NDkzMjA4MzU4Nn0.6hYy0guxbgGyG0e17LpH5m31MJfRDmsQ9XhLWdnHnraYHDxozUO92MsLj9Az06JsfHrvfqU2f451JAq3Dt3kDw"
 
-  # FastAPI gateway (if it exposes /metrics via prometheus-fastapi-instrumentator)
+  # faasd-provider (containerd provider metrics on port 8081)
+  - job_name: "faasd-provider"
+    static_configs:
+      - targets: ["localhost:8081"]
+    metrics_path: /metrics
+
+  # FastAPI gateway (now exposes /metrics via prometheus_client)
   - job_name: "fastapi-gateway"
     static_configs:
-      - targets: ["gateway:5000"]
+      - targets: ["localhost:5000"]
     metrics_path: /metrics
+

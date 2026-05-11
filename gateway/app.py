@@ -26,6 +26,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 import io
 from minio import Minio
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+# ---------------------------------------------------------------------------
+# Prometheus Metrics (matching OpenFaaS standard metric names for Grafana)
+# ---------------------------------------------------------------------------
+GATEWAY_INVOCATIONS = Counter(
+    "gateway_function_invocation_total",
+    "Total number of function invocations through the gateway",
+    ["function_name", "status_code"],
+)
+GATEWAY_DURATION = Histogram(
+    "gateway_functions_seconds",
+    "Function execution duration in seconds",
+    ["function_name"],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -75,6 +91,8 @@ def _fn_url(name: str) -> str:
 
 def _call_fn(fn_name: str, payload: dict) -> dict:
     """POST JSON payload to an OpenFaaS function, return parsed JSON body."""
+    t_start = time.time()
+    status_code = "200"
     try:
         resp = requests.post(
             _fn_url(fn_name),
@@ -82,9 +100,19 @@ def _call_fn(fn_name: str, payload: dict) -> dict:
             timeout=FN_TIMEOUT,
         )
     except requests.Timeout:
+        status_code = "504"
+        GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
+        GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
         raise HTTPException(status_code=504, detail=f"{fn_name} timed out after {FN_TIMEOUT}s")
     except requests.ConnectionError as exc:
+        status_code = "502"
+        GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
+        GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
         raise HTTPException(status_code=502, detail=f"Cannot reach {fn_name}: {exc}")
+
+    status_code = str(resp.status_code)
+    GATEWAY_INVOCATIONS.labels(function_name=fn_name, status_code=status_code).inc()
+    GATEWAY_DURATION.labels(function_name=fn_name).observe(time.time() - t_start)
 
     try:
         body = resp.json()
@@ -156,6 +184,12 @@ def _b64_to_image_response(b64_str: str, fmt: str = "JPEG", minio_path: str = ""
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@app.get("/metrics", summary="Prometheus metrics endpoint", include_in_schema=False)
+def metrics():
+    """Exposes Prometheus metrics for scraping."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/ping", summary="Instant liveness check")
 def ping():
